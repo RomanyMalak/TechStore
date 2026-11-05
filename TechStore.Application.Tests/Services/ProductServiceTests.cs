@@ -302,6 +302,28 @@ public class ProductServiceTests
         VerifyNoWrites();
     }
 
+    [Fact]
+    public async Task UpdateExistingProductInInactiveCategory_RemainsManageableByAdmin()
+    {
+        _category.Deactivate();
+        var response = await _service.UpdateProductAsync(7, ValidUpdate());
+        Assert.Equal("Updated laptop", response.Name);
+        Assert.Equal(_category.Id, response.CategoryId);
+        _products.Verify(repository => repository.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateMovingProductToDifferentInactiveCategory_IsRejected()
+    {
+        var inactive = new Category { Id = 2, Name = "Inactive", IsActive = false };
+        _categories.Setup(repository => repository.GetByIdAsync(2, true, It.IsAny<CancellationToken>())).ReturnsAsync(inactive);
+        var dto = ValidUpdate();
+        dto.CategoryId = inactive.Id;
+        await Assert.ThrowsAsync<ValidationException>(() => _service.UpdateProductAsync(7, dto));
+        Assert.Equal(1, _existing.CategoryId);
+        VerifyNoWrites();
+    }
+
     private void VerifyNoWrites()
     {
         _products.Verify(repository => repository.AddAsync(It.IsAny<Product>(), It.IsAny<CancellationToken>()), Times.Never);
