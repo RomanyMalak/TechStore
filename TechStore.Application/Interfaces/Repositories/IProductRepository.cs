@@ -9,6 +9,8 @@ public interface IProductRepository
     Task<Product?> GetByIdAsync(int id, bool includeInactive = false, CancellationToken cancellationToken = default);
     Task<Product?> GetForUpdateAsync(int id, CancellationToken cancellationToken = default);
     Task<PagedResult<Product>> GetAllAsync(ProductQueryDto query, bool includeInactive = false, CancellationToken cancellationToken = default);
+    Task<ProductSummaryDto> GetSummaryAsync(CancellationToken cancellationToken = default);
+    Task<bool> IsImageReferencedAsync(string imageUrl, CancellationToken cancellationToken = default);
     Task AddAsync(Product product, CancellationToken cancellationToken = default);
     void Update(Product product, byte[] expectedRowVersion);
     void SoftDelete(Product product, byte[] expectedRowVersion);
