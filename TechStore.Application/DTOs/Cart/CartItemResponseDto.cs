@@ -8,6 +8,8 @@ public class CartItemResponseDto
     public string SKU { get; set; } = string.Empty;
     public string? ImageUrl { get; set; }
     public decimal UnitPrice { get; set; }
+    public decimal OriginalUnitPrice { get; set; }
+    public int Stock { get; set; }
     public int Quantity { get; set; }
     public decimal LineTotal { get; set; }
     public bool IsAvailable { get; set; }
