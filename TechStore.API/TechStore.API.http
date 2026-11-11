@@ -1,6 +1,14 @@
-@TechStore.API_HostAddress = http://localhost:5285
+@TechStore.API_HostAddress = https://localhost:7156
 
-GET {{TechStore.API_HostAddress}}/weatherforecast/
+GET {{TechStore.API_HostAddress}}/api/products?PageNumber=1&PageSize=20&SortBy=PriceAscending
 Accept: application/json
 
 ###
+
+GET {{TechStore.API_HostAddress}}/api/categories
+Accept: application/json
+
+###
+
+# Use Swagger /api/auth/login and Authorize for protected requests.
+# Keep passwords and access tokens out of this source-controlled file.

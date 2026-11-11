@@ -1,3 +1,7 @@
+using TechStore.Application;
+using TechStore.API.Configuration;
+using TechStore.API.Errors;
+using TechStore.Infrastructure;
 
 namespace TechStore.API
 {
@@ -9,24 +13,30 @@ namespace TechStore.API
 
             // Add services to the container.
 
-            builder.Services.AddControllers();
-            // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-            builder.Services.AddEndpointsApiExplorer();
-            builder.Services.AddSwaggerGen();
+            builder.Services.AddApplication();
+            builder.Services.AddInfrastructure(builder.Configuration);
+            builder.Services.AddApi();
 
             var app = builder.Build();
 
-            // Configure the HTTP request pipeline.
+            // A missing socket peer must never make caller-controlled forwarding headers trusted.
+            app.UseWhen(context => context.Connection.RemoteIpAddress is not null,
+                pipeline => pipeline.UseForwardedHeaders());
+            app.UseExceptionHandler();
+            app.UseStatusCodePages(context => ApiProblemWriter.WriteAsync(context.HttpContext,
+                ApiProblemWriter.Create(context.HttpContext, context.HttpContext.Response.StatusCode, "The request could not be completed."),
+                context.HttpContext.RequestAborted));
+            app.UseHttpsRedirection();
+            app.UseRouting();
+            app.UseAuthentication();
+            app.UseAuthorization();
+            app.UseRateLimiter();
+
             if (app.Environment.IsDevelopment())
             {
                 app.UseSwagger();
                 app.UseSwaggerUI();
             }
-
-            app.UseHttpsRedirection();
-
-            app.UseAuthorization();
-
 
             app.MapControllers();
 
