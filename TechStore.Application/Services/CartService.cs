@@ -10,24 +10,39 @@ using TechStore.Domain.Entities;
 namespace TechStore.Application.Services;
 
 public sealed class CartService(ICommerceRepository repository, IValidator<AddToCartDto> addValidator,
-    IValidator<UpdateCartItemDto> updateValidator) : ICartService
+    IValidator<UpdateCartItemDto> updateValidator, TimeProvider? timeProvider = null) : ICartService
 {
+    private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
     public async Task<CartResponseDto> GetAsync(CartOwner owner, CancellationToken cancellationToken = default) =>
         (await repository.GetCartAsync(owner, false, cancellationToken) ?? EmptyCart(owner)).ToCartResponse();
 
     public async Task<CartResponseDto> AddAsync(CartOwner owner, AddToCartDto dto, CancellationToken cancellationToken = default)
     {
         await RequestValidation.ValidateAsync(addValidator, dto, cancellationToken);
-        return await ChangeAsync(owner, dto.ProductId, dto.Quantity, true, cancellationToken);
+        return await ChangeAsync(owner, dto.ProductId, dto.Quantity, dto.ClientRequestId ?? Guid.NewGuid(), cancellationToken);
     }
     public async Task<CartResponseDto> UpdateAsync(CartOwner owner, int productId, UpdateCartItemDto dto, CancellationToken cancellationToken = default)
     {
         await RequestValidation.ValidateAsync(updateValidator, dto, cancellationToken);
-        return await ChangeAsync(owner, productId, dto.Quantity, false, cancellationToken);
+        return await ChangeAsync(owner, productId, dto.Quantity, null, cancellationToken);
     }
-    private Task<CartResponseDto> ChangeAsync(CartOwner owner, int productId, int quantity, bool add, CancellationToken cancellationToken) =>
+    private Task<CartResponseDto> ChangeAsync(CartOwner owner, int productId, int quantity, Guid? requestId, CancellationToken cancellationToken) =>
         repository.ExecuteInTransactionAsync(async token =>
         {
+            var add = requestId.HasValue;
+            var ownerHash = CommerceMapping.Hash(owner.UserId is not null
+                ? "user:" + owner.UserId : "guest:" + owner.GuestKey);
+            // A committed retry must succeed even if the product's availability changed afterward.
+            if (requestId.HasValue)
+            {
+                var previous = await repository.GetCartAdditionByRequestAsync(ownerHash, requestId.Value, token);
+                if (previous is not null)
+                {
+                    if (previous.ProductId != productId || previous.Quantity != quantity)
+                        throw new CommerceConflictException("IdempotencyMismatch", "This request identity was already used for a different cart addition.");
+                    return (await repository.GetCartAsync(owner, true, token) ?? EmptyCart(owner)).ToCartResponse();
+                }
+            }
             var cart = await repository.GetCartAsync(owner, true, token);
             if (!add && cart?.Items.Any(item => item.ProductId == productId) != true)
                 throw new NotFoundException(nameof(CartItem), productId);
@@ -40,6 +55,9 @@ public sealed class CartService(ICommerceRepository repository, IValidator<AddTo
             RequestValidation.ApplyDomainRules(() => { cart.SetQuantity(productId, (int)total); return cart; });
             cart.Items.Single(item => item.ProductId == productId).Product = product;
             if (isNew) await repository.AddCartAsync(cart, token);
+            if (requestId.HasValue)
+                await repository.AddCartAdditionAsync(CartAdditionEvent.Create(productId, quantity, ownerHash,
+                    requestId.Value, clock.GetUtcNow().UtcDateTime), token);
             await repository.SaveChangesAsync(token);
             return cart.ToCartResponse();
         }, cancellationToken);

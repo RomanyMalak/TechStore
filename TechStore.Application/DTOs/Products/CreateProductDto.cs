@@ -31,5 +31,5 @@ public class CreateProductDto
     public bool IsActive { get; set; } = true;
 
     [Required]
-    public List<ProductImageRequestDto> Images { get; set; } = new();
+    public virtual List<ProductImageRequestDto> Images { get; set; } = new();
 }

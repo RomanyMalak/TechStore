@@ -11,6 +11,8 @@ public interface ICommerceRepository
     Task<Order?> GetOrderAsync(string userId, int id, CancellationToken cancellationToken);
     Task<Order?> GetOrderByRequestAsync(string userId, Guid requestId, CancellationToken cancellationToken);
     Task AddCartAsync(Cart cart, CancellationToken cancellationToken);
+    Task<CartAdditionEvent?> GetCartAdditionByRequestAsync(string ownerHash, Guid clientRequestId, CancellationToken cancellationToken);
+    Task AddCartAdditionAsync(CartAdditionEvent addition, CancellationToken cancellationToken);
     void RemoveCart(Cart cart);
     Task AddOrderAsync(Order order, CancellationToken cancellationToken);
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
